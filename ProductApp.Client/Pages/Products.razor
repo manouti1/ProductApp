@@ -1,0 +1,194 @@
+@page "/"
+@using ProductApp.Client.Services
+@using ProductApp.Client.Shared
+@using ProductApp.Shared
+@inject IProductService ProductService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Product List</MudText>
+
+    <MudTextField Value="@searchTerm"
+                  ValueChanged="@( (string value) => OnSearchTermChanged(value) )"
+                  Immediate="true"
+                  Placeholder="Search by name..."
+                  Variant="Variant.Outlined"
+                  Class="mb-4" />
+
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@CreateNewProduct">Add New Product</MudButton>
+
+    <MudTable Items="pagedProductList" Hover="true" Class="mt-4" RowsPerPage="rowsPerPage" CurrentPage="@currentPage" OnPageChanged="OnPageChanged">
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh>Price</MudTh>
+            <MudTh>Quantity</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.Description</MudTd>
+            <MudTd>@context.Price.ToString("C")</MudTd>
+            <MudTd>@context.Quantity</MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Color="Color.Primary" OnClick="@(() => Edit(context))">Edit</MudButton>
+                <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => ConfirmDelete(context))" Class="ml-2">Delete</MudButton>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<Product> productList = new();
+    private List<Product> filteredProductList = new();
+    private List<Product> pagedProductList = new();
+    private int rowsPerPage = 10;
+    private int currentPage = 0;
+    private string searchTerm = string.Empty;
+    private Product? SelectedProduct;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        productList = (await ProductService.GetAllAsync()).ToList();
+        FilterProducts();
+    }
+
+    private async Task OnSearchTermChanged(string value)
+    {
+        searchTerm = value;
+        FilterProducts();
+    }
+
+    private void FilterProducts()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filteredProductList = productList;
+        }
+        else
+        {
+            filteredProductList = productList
+                .Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            p.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        currentPage = 0; // Reset to first page
+        UpdatePagedProductList();
+        StateHasChanged();
+    }
+
+
+    private void OnPageChanged(int page)
+    {
+        currentPage = page;
+        UpdatePagedProductList();
+    }
+
+    private void UpdatePagedProductList()
+    {
+        pagedProductList = filteredProductList
+            .Skip(currentPage * rowsPerPage)
+            .Take(rowsPerPage)
+            .ToList();
+    }
+
+    private async Task OpenProductDialog(Product product, bool isEditMode)
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(ProductForm.Product), product },
+            { nameof(ProductForm.IsEditMode), isEditMode }
+        };
+
+        var options = new DialogOptions
+            {
+                CloseButton = true,
+                MaxWidth = MaxWidth.Small,
+                FullWidth = true
+            };
+
+        var dialog = DialogService.Show<ProductForm>(
+            isEditMode ? "Edit Product" : "Add Product",
+            parameters,
+            options
+        );
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is Product updatedProduct)
+        {
+            if (!isEditMode)
+            {
+                var createdProduct = await ProductService.CreateAsync(updatedProduct);
+                productList.Add(createdProduct);
+            }
+            else
+            {
+                await ProductService.UpdateAsync(updatedProduct);
+                var index = productList.FindIndex(p => p.Id == updatedProduct.Id);
+                if (index >= 0)
+                {
+                    productList[index] = updatedProduct;
+                }
+                else
+                {
+                    await LoadProducts();
+                }
+            }
+
+            FilterProducts();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateNewProduct()
+    {
+        SelectedProduct = null;
+        await OpenProductDialog(new Product(), false);
+    }
+
+    private void Edit(Product product)
+    {
+        OpenProductDialog(product, true);
+    }
+
+    private async Task ConfirmDelete(Product product)
+    {
+        var parameters = new DialogParameters
+        {
+            { "ContentText", $"Are you sure you want to delete {product.Name}?" }
+        };
+
+        var options = new DialogOptions { CloseButton = true, MaxWidth = MaxWidth.Small };
+
+        var dialog = DialogService.Show<DeleteConfirmationDialog>("Confirm Deletion", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await Delete(product.Id);
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        try
+        {
+            await ProductService.DeleteAsync(id);
+            await LoadProducts();
+            Snackbar.Add("Product deleted successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting product: {ex.Message}", Severity.Error);
+        }
+    }
+}

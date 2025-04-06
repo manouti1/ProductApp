@@ -1,0 +1,64 @@
+﻿@using MudBlazor
+@using ProductApp.Shared
+@inject ISnackbar Snackbar
+
+<MudDialog Class="blur dialog-background" TitleClass="blur dialog-background-title" ContentClass="dialog-background-surface py-10" ActionsClass="dialog-background-surface">
+    <DialogContent>
+        @if (Product != null)
+        {
+            <MudForm @ref="form" OnValidSubmit="Submit" OnInvalidSubmit="ShowErrorSnackbar">
+                <MudTextField @bind-Value="model.Name" Label="Name" Required="true" RequiredError="Name is required" FullWidth="true" Class="mb-3" />
+                <MudTextField @bind-Value="model.Description" Label="Description" FullWidth="true" Class="mb-3" />
+                <MudNumericField @bind-Value="model.Price" Label="Price" Required="true" RequiredError="Price is required" FullWidth="true" Class="mb-3" />
+                <MudNumericField @bind-Value="model.Quantity" Label="Quantity" Required="true" RequiredError="Quantity is required" FullWidth="true" Class="mb-3" />
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">@(IsEditMode ? "Update" : "Save")</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public Product Product { get; set; }
+    [Parameter] public bool IsEditMode { get; set; } 
+    private Product model;
+    private MudForm form;
+
+    protected override void OnInitialized()
+    {
+        model = Product ?? new Product();
+    }
+
+    private async Task Submit()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            if (model.Price < 0 || model.Quantity < 0)
+            {
+                Snackbar.Add("Price and quantity must be non-negative", Severity.Error);
+                return;
+            }
+
+            MudDialog.Close(DialogResult.Ok(model)); 
+            Snackbar.Add(IsEditMode ? "Product updated successfully!" : "Product saved successfully!", Severity.Success); 
+        }
+        else
+        {
+            Snackbar.Add("Please fill all required fields correctly.", Severity.Error);
+        }
+    }
+
+    private void ShowErrorSnackbar()
+    {
+        Snackbar.Add("There was an error with the form submission. Please check your inputs.", Severity.Error); 
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Close(DialogResult.Cancel()); 
+    }
+}
