@@ -13,9 +13,16 @@ public class Program
         builder.RootComponents.Add<App>("#app");
         builder.RootComponents.Add<HeadOutlet>("head::after");
 
+
+        // Load configuration from appsettings.json
+        builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+
+        // Get the BaseApiUrl from the configuration
+        var baseApiUrl = builder.Configuration["ApiSettings:BaseApiUrl"];
+
         builder.Services.AddScoped(sp => new HttpClient
         {
-            BaseAddress = new Uri("https://localhost:7237/")
+            BaseAddress = new Uri(baseApiUrl)  // Set BaseAddress dynamically
         });
 
         builder.Services.AddScoped<IProductService, ProductService>();
