@@ -1,7 +1,9 @@
 # ProductApp
 
 ## Overview
-ProductApp is a web application for managing products. It allows users to create, edit, delete, and search for products. The application is built using Blazor WebAssembly and leverages MudBlazor for UI components.
+ProductApp is a web application for managing products. It allows users to create, edit, delete, and search for products. The application is built using Blazor WebAssembly and leverages MudBlazor for UI components. App is accessible via this link 
+[ProductApp](https://67f56315a59b0b09e83a3c38--funny-baklava-91f440.netlify.app/)
+
 
 ## Features
 - Add new products
